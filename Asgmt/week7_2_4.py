@@ -16,7 +16,7 @@ try:
         elif SW3.is_pressed == True:
             BUZZER.play(329)
         elif SW4.is_pressed == True:
-            BUZZER.play(349)
+            BUZZER.play(392)
         else:
             BUZZER.stop()
             

@@ -1,26 +1,63 @@
-from gpiozero import  TonalBuzzer,Button
+from gpiozero import  TonalBuzzer
 import time
 
 BUZZER = TonalBuzzer(12)
-SW1 = Button(5, pull_up=False )
-SW2 = Button(6, pull_up=False )
-SW3 = Button(13, pull_up=False )
-SW4 = Button(19, pull_up=False )
 
 try:
     while True:
-        if SW1.is_pressed == True:
-            BUZZER.play(261)
-        elif SW2.is_pressed == True:
-            BUZZER.play(293)
-        elif SW3.is_pressed == True:
-            BUZZER.play(329)
-        elif SW4.is_pressed == True:
-            BUZZER.play(349)
-        else:
-            BUZZER.stop()
-            
+        BUZZER.play(262)
+        time.sleep(0.2)
         
+        BUZZER.stop()
+        time.sleep(0.1)
+        
+        BUZZER.play(394)
+        time.sleep(0.2)
+        
+        BUZZER.stop()
+        time.sleep(0.1)
+        
+        BUZZER.play(330)
+        time.sleep(0.2)
+        
+        BUZZER.stop()
+        time.sleep(0.1)
+        
+        BUZZER.play(349)
+        time.sleep(0.2)
+        
+        BUZZER.stop()
+        time.sleep(0.1)
+        
+        BUZZER.play(292)
+        time.sleep(0.2)
+        
+        BUZZER.stop()
+        time.sleep(0.1)
+        
+        BUZZER.play(440)
+        time.sleep(0.2)
+        
+        BUZZER.stop()
+        time.sleep(0.1)
+        
+        BUZZER.play(494)
+        time.sleep(0.2)
+        
+        BUZZER.stop()
+        time.sleep(0.1)
+        
+        BUZZER.play(523)
+        time.sleep(0.2)
+        
+        BUZZER.stop()
+        time.sleep(0.1)
+        
+        BUZZER.stop()
+        time.sleep(2.0)
+        
+        
+
 except KeyboardInterrupt:
     pass
 

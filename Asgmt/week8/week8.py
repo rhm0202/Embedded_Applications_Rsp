@@ -16,53 +16,53 @@ PWMB = PWMOutputDevice(23)
 BIN1 = DigitalOutputDevice(25)
 BIN2 = DigitalOutputDevice(24)
 
-def motor_go(speed):
+def go():
     AIN1.value = 0
     AIN2.value = 1
-    PWMA.value = speed
+    PWMA.value = 0.5 # 0.0~1.0 speed
     BIN1.value = 0
     BIN2.value = 1
-    PWMB.value = speed
+    PWMB.value = 0.5 # 0.0~1.0 speed
 
-def motor_back(speed):
+def back():
     AIN1.value = 1
     AIN2.value = 0
-    PWMA.value = speed
+    PWMA.value = 0.5 # 0.0~1.0 speed
     BIN1.value = 1
     BIN2.value = 0
-    PWMB.value = speed
-    
-def motor_left(speed):
+    PWMB.value = 0.5 # 0.0~1.0 speed
+
+def left():
     AIN1.value = 1
     AIN2.value = 0
-    PWMA.value = speed
+    PWMA.value = 0.5 # 0.0~1.0 speed
     BIN1.value = 0
     BIN2.value = 1
-    PWMB.value = speed
+    PWMB.value = 0.5 # 0.0~1.0 speed
     
-def motor_right(speed):
+def right():
     AIN1.value = 0
     AIN2.value = 1
-    PWMA.value = speed
+    PWMA.value = 0.5 # 0.0~1.0 speed
     BIN1.value = 1
     BIN2.value = 0
-    PWMB.value = speed
-
-def motor_stop():
+    PWMB.value = 0.5 # 0.0~1.0 speed
+    
+def stop():
     AIN1.value = 0
     AIN2.value = 1
-    PWMA.value = 0.0
-    BIN1.value = 0
-    BIN2.value = 1
-    PWMB.value = 0.0
-
+    PWMA.value = 0.0 # 0.0~1.0 speed
+    BIN1.value = 1
+    BIN2.value = 0
+    PWMB.value = 0.0 # 0.0~1.0 speed
+    
 def serial_thread():
     global gData
     while True:
         data = bleSerial.readline()
         data = data.decode()
         gData = data
-
+        
 def main():
     global gData
     try:
@@ -70,27 +70,27 @@ def main():
             if gData.find("go") >= 0:
                 gData = ""
                 print("ok go")
-                motor_go(0.5)
+                go()
             elif gData.find("back") >= 0:
                 gData = ""
                 print("ok back")
-                motor_back(0.5)
+                back()
             elif gData.find("left") >= 0:
                 gData = ""
                 print("ok left")
-                motor_left(0.5)
+                left()
             elif gData.find("right") >= 0:
                 gData = ""
                 print("ok right")
-                motor_right(0.5)
+                right()
             elif gData.find("stop") >= 0:
                 gData = ""
                 print("ok stop")
-                motor_stop()
+                stop()
 
     except KeyboardInterrupt:
         pass
-
+    
 if __name__ == '__main__':
     task1 = threading.Thread(target = serial_thread)
     task1.start()

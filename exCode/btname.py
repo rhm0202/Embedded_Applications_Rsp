@@ -5,7 +5,7 @@ import serial
 # ==========
 # parameters
 # ==========
-devicename = "MyDevice"
+devicename = "Ryu"
 pinnumber = "123456"
 
 

@@ -10,6 +10,8 @@ def main():
 
     while camera.isOpened():
         ret, image = camera.read()
+        image = cv2.flip(image, 0)
+        
         if not ret:
             break
         
@@ -17,9 +19,9 @@ def main():
         faces = face_cascade.detectMultiScale(gray)
         
         for (x, y, w, h) in faces:
-            cv2.rectangle(image, (x, y), (x + w, y + h), (0, 255, 0), 2)
+            cv2.rectangle(image, (x, y), (x + w, y + h), (255, 0, 0), 1)
         
-        image = cv2.flip(image, 0)
+        
         
         cv2.imshow('camera test', image)
 

@@ -6,7 +6,7 @@ def main():
     camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
     camera.set(cv2.CAP_PROP_FPS, 30)
     
-    face_cascade = cv2.CascadeClassifier("../etc/haarcascade_frontalface_default.xml")
+    face_cascade = cv2.CascadeClassifier("etc/haarcascade_frontalface_default.xml")
 
     while camera.isOpened():
         ret, image = camera.read()

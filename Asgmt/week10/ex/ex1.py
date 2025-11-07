@@ -1,22 +1,4 @@
-import cv2
+import cv2 as cv
+import sys
 
-def main():
-    camera = cv2.VideoCapture(0)
-    camera.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-    camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-    camera.set(cv2.CAP_PROP_FPS, 30)
-
-    while camera.isOpened():
-        ret, image = camera.read()
-        if not ret:
-            break
-        cv2.imshow('camera test', image)
-
-        if cv2.waitKey(1) == ord('q'):
-            break
-
-    camera.release()
-    cv2.destroyAllWindows()
-
-if __name__ == '__main__':
-    main()
+img = cv.imread()

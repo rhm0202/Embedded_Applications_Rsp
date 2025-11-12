@@ -1,4 +1,5 @@
-import cv2
+#1.
+mport cv2
 
 def main():
     camera = cv2.VideoCapture(0)

@@ -1,50 +1,45 @@
 import cv2
+import numpy as np
 
-image = cv2.imread("./img/1.jpg")
-image2 = image.copy()
+IMGS = ["./img/1.jpg", "./img/2.jpg", "./img/3.jpg", "./img/4.jpg"]   # 올려준 파일명
 
-# 컨투어 찾기 전 이미지 전처리
-gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-gray = cv2.GaussianBlur(gray, (5, 5), 0)
-gray = cv2.bitwise_not(gray) # 객체보다 배경이 밝은 경우 이미지 반전
+#노란색 마스크 범위
+Y1_LO = np.array([25,  85, 150], np.uint8)
+Y1_HI = np.array([40, 255, 255], np.uint8)
 
-# canny edge, threshold 등 다양한 전처리 시도 -> 객체와 배경을 가장 잘 분리하는 전처리 사용
-edge = cv2.Canny(gray, 100, 100)
-_, thresh = cv2.threshold(gray, 127, 255, cv2.THRESH_BINARY)
-adaptive_threshold= cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 11, 2)
+def get_yellow_mask(bgr):
+    hsv = cv2.cvtColor(bgr, cv2.COLOR_BGR2HSV)
+    h, s, v = cv2.split(hsv)
+    hsv = cv2.merge((h, s, v))
 
-thresh = cv2.erode(thresh, None, iterations=2)
-thresh = cv2.dilate(thresh, None, iterations=2)
+    mask = cv2.inRange(hsv, Y1_LO, Y1_HI)
+    return mask
 
-# 컨투어 찾기
-contours, hierachy = cv2.findContours(thresh.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+def process(path):
+    img = cv2.imread(path)
 
+    if img is None:
+        print(f"[WARN] 읽기 실패: {path}")
+        return
 
-# 컨투어 면적이 큰 순으로 정렬
-sorted_contours = sorted(contours, key=cv2.contourArea, reverse=True)
+    h, w = img.shape[:2]
 
-for i in range(len(sorted_contours)):
-    contour = sorted_contours[i]
-    
-    # 근사 컨투어 계산을 위한 0.01의 오차 범위 지정 
-    epsilon = 0.01 * cv2.arcLength(contour, True)
-    approx = cv2.approxPolyDP(contour, epsilon, True)
+    # 노란색 라인 마스크 추출
+    mask = get_yellow_mask(img)
 
-    cv2.drawContours(image, [contour], -1, (0,255,0), 3)
-    cv2.drawContours(image2, [approx], -1, (0,255,0), 3)
+    lay = img.copy()
+    lay[mask > 0] = (155,50,155)
 
-    extLeft = tuple(contour[contour[:, :, 0].argmin()][0])
-    extRight = tuple(contour[contour[:, :, 0].argmax()][0])
-    extTop = tuple(contour[contour[:, :, 1].argmin()][0])
-    extBot = tuple(contour[contour[:, :, 1].argmax()][0])
+    out_over = cv2.addWeighted(img, 0.5, lay, 0.5, 0)
 
-    cv2.circle(image, extLeft, 8, (0, 0, 255), -1)
-    cv2.circle(image, extRight, 8, (0, 255, 0), -1)
-    cv2.circle(image, extTop, 8, (255, 0, 0), -1)
-    cv2.circle(image, extBot, 8, (255, 255, 0), -1)
+    cv2.imshow("Overlay", out_over)
 
-# 결과 출력
-cv2.imshow('contour', image)
-cv2.imshow('approx', image2)
-cv2.waitKey()
-cv2.destroyAllWindows()
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
+
+def main():
+    for p in IMGS:
+        process(p)
+
+if __name__ == "__main__":
+    main()

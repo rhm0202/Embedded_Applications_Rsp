@@ -17,16 +17,16 @@ def key_cmd(which_key):
     is_exit = False
     if which_key & 0xFF == 184:
         print('up')
-        car.motor_go(100)
+        car.motor_go(50)
     elif which_key & 0xFF == 178:
         print('down')
-        car.motor_back(100)
+        car.motor_back(50)
     elif which_key & 0xFF == 180:
         print('left')     
-        car.motor_left(100)   
+        car.motor_left(50)   
     elif which_key & 0xFF == 182:
         print('right')   
-        car.motor_right(100)            
+        car.motor_right(50)            
     elif which_key & 0xFF == 181:
         car.motor_stop()
         print('stop')   

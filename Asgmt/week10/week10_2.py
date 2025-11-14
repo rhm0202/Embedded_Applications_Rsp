@@ -2,7 +2,7 @@
 import cv2
 import numpy as np
 
-IMGS = ["./img/1.jpg", "./img/2.jpg", "./img/3.jpg", "./img/4.jpg"]  # 올려준 파일명
+IMGS = ["./img/1.jpg", "./img/2.jpg", "./img/3.jpg", "./img/4.jpg"] 
 
 # 노란색 마스크 범위
 Y1_LO = np.array([25, 85, 150], np.uint8)

@@ -143,11 +143,6 @@ def line_tracing(cx):
         angle_to_save = 0
         moment = [0, 0, 0]
         
-def show_grid(img):
-    h, _, _ = img.shape
-    for x in v_x_grid:
-        # print('show_grid', x)
-        cv.line(img, (x, 0), (x, h), (0, 255, 0), 1, cv.LINE_4)
         
 def main():
 
@@ -191,8 +186,6 @@ def main():
                 # 상태 초기화
                 last_save_time = current_time
                 save_flag = False
-            
-            show_grid(crop_img)
                 
             # maskY = detect_maskY_HSV(crop_img)
             cv.imshow('crop_img', crop_img)

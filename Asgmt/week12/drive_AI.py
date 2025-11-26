@@ -198,7 +198,7 @@ if __name__ == '__main__':
     print(v_x_grid)
     moment = np.array([0, 0, 0])
 
-    model_path = 'lane_navigation_20251126_1643'
+    model_path = 'lane_navigation_20251126_1643.h5'
 
     
     model = load_model(model_path)

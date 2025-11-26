@@ -188,7 +188,6 @@ def main():
                 save_flag = False
                 
             # maskY = detect_maskY_HSV(crop_img)
-            cv.imshow('crop_img', crop_img)
             cv.imshow('maskY', maskY)
             # cv.imshow('maskY2', maskY2)
 

@@ -162,14 +162,11 @@ def main():
     
     try:
         while( camera.isOpened() ):
-            ret, frame = camera.read()
             frame = cv.flip(frame,-1)
-            cv.imshow('camera',frame)
-
-            # image processing start here
-            crop_img = frame[180:, :]
+            crop_img = frame[int(v_y/2):,:]
+            crop_img = cv.resize(crop_img, (200, 66))
+            cv.imshow('crop_img',cv.resize(crop_img, (0,0), fx=2, fy=2))
             
-
             maskY = detect_maskY_HSV(crop_img)
             # maskY2 = detect_maskY_BGR(crop_img)
             
@@ -182,11 +179,6 @@ def main():
                 cx = int((m['m10'] / (m['m00'] + epsilon)))
                 cy = int((m['m01'] / (m['m00'] + epsilon)))
 
-                cv.circle(crop_img, (cx, cy), 3, (0, 0, 255), -1)
-                cv.drawContours(crop_img, contours, -1, (0, 255, 0), 3)
-
-                cv.putText(crop_img, str(cx), (10, 10), cv.FONT_HERSHEY_DUPLEX, 0.5, (0, 255, 0), 1)
-            
             if enable_linetracing == True:
                 line_tracing(cx)
                 

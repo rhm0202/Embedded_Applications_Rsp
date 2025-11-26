@@ -159,9 +159,10 @@ def main():
         while( camera.isOpened() ):
             ret, frame = camera.read()
             frame = cv.flip(frame,-1)
+            
             crop_img = frame[int(v_y/2):,:]
             crop_img = cv.resize(crop_img, (200, 66))
-            cv.imshow('crop_img',cv.resize(crop_img, (0,0), fx=2, fy=2))
+            cv.imshow('crop_img',cv.resize(crop_img, dsize=(0,0), fx=2, fy=2))
             
             maskY = detect_maskY_HSV(crop_img)
             # maskY2 = detect_maskY_BGR(crop_img)

@@ -162,6 +162,7 @@ def main():
     
     try:
         while( camera.isOpened() ):
+            ret, frame = camera.read()
             frame = cv.flip(frame,-1)
             crop_img = frame[int(v_y/2):,:]
             crop_img = cv.resize(crop_img, (200, 66))

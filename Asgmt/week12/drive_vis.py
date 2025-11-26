@@ -1,7 +1,7 @@
 import cv2 as cv
 import numpy as np
 import threading, time
-from module import SDcar 
+import SDcar 
 import sys
 import os
 import datetime

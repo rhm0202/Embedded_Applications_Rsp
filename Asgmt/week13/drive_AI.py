@@ -115,6 +115,7 @@ def object_detection_thread():
         if global_frame is None:
             OD_frame_lock.release()
             time.sleep(0.01)
+            print("OD: Waiting for frame...")
             continue
             
         frame_to_process = global_frame.copy() 
@@ -158,9 +159,11 @@ def object_detection_thread():
             if is_emergency_stop == False:
                 car.motor_stop()
                 is_emergency_stop = True
+                print("OD: !!! EMERGENCY STOP TRIGGERED !!!")
         
         elif is_emergency_stop == True:
             is_emergency_stop = False
+            print("OD: Emergency stop released.")
 
         OD_frame_lock.acquire()
         global_frame = frame_to_process

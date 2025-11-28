@@ -14,7 +14,7 @@ global_frame = None
 OD_frame_lock = threading.Lock()
 
 no_object_counter = 0
-NO_OBJECT_THRESHOLD = 10
+NO_OBJECT_THRESHOLD = 3
 
 detection_interval = 1
 frame_counter = 0
@@ -187,7 +187,7 @@ if __name__ == '__main__':
     v_y = 240
     v_x_grid = [int(v_x*i/10) for i in range(1, 10)]
     print(v_x_grid)
-    model_path = 'modul/lane_navigation_20251128_1726.h5'
+    model_path = 'modul/lane_navigation_20251128_1838.h5'
     model = load_model(model_path)
     car = SDcar.Drive()
     is_running = True

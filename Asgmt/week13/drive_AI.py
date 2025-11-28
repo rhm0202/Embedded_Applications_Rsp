@@ -246,7 +246,7 @@ if __name__ == '__main__':
     print(v_x_grid)
     moment = np.array([0, 0, 0])
 
-    model_path = 'lane_navigation_20251127_1059.h5'
+    model_path = 'modul/lane_navigation_20251127_1059.h5'
     model = load_model(model_path)
     
     OD_MODEL = cv.dnn.readNetFromTensorflow(

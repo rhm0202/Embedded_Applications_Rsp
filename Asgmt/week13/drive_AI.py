@@ -169,7 +169,7 @@ def object_detection_thread():
         global_frame = frame_to_process
         OD_frame_lock.release()
 
-        time.sleep(0.001)
+        time.sleep(0.1)
     
 def main():
     global global_frame
@@ -181,6 +181,10 @@ def main():
     camera = cv.VideoCapture(0)
     camera.set(cv.CAP_PROP_FRAME_WIDTH,v_x) 
     camera.set(cv.CAP_PROP_FRAME_HEIGHT,v_y)
+    if not camera.isOpened():
+        print("Error: Camera failed to open. Check index or connection.")
+        is_running = False
+        return
     
     try:
         while( camera.isOpened() ):

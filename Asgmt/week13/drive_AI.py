@@ -1,10 +1,10 @@
 import cv2 as cv
 import numpy as np
 import threading, time
-from modul import SDcar 
 import sys
 import tensorflow as tf
 from tensorflow.keras.models import load_model
+from modul import SDcar
 
 speed = 80
 epsilon = 0.0001
@@ -12,255 +12,187 @@ epsilon = 0.0001
 is_emergency_stop = False 
 enable_OD = False        
 is_running = False 
+enable_AIdrive = False
 
 global_frame = None 
 OD_frame_lock = threading.Lock()
 
 detection_interval = 5
 frame_counter = 0
-
 OD_CLASS_NAMES = []
 with open('modul/object_detection_classes_coco.txt', 'r') as f: 
-    OD_CLASS_NAMES = f.read().split('\n')
+    OD_CLASS_NAMES = [ln.strip() for ln in f if ln.strip()]
 
 OD_MODEL = None 
 STOP_CLASSES = ['mouse', 'cell phone']
 
-def func_thread():
-    global is_running # [수정] global is_running 선언 추가
-    i = 0
-    while True:
-        time.sleep(1)
-        i = i+1
-        if is_running is False:
-            break
-
 def key_cmd(which_key):
-    print('which_key', which_key)
+    global enable_AIdrive, is_emergency_stop, enable_OD, car
     is_exit = False 
-    global enable_AIdrive
-    global is_emergency_stop
-    global enable_OD
-    
-    if which_key & 0xFF == 184:
-        print('up')
+
+    if which_key & 0xFF == ord('w'):
         car.motor_go(speed)
-    elif which_key & 0xFF == 178:
-        print('down')
+    elif which_key & 0xFF == ord('s'):
         car.motor_back(speed)
-    elif which_key & 0xFF == 180:
-        print('left')     
+    elif which_key & 0xFF == ord('a'):
         car.motor_left(30)   
-    elif which_key & 0xFF == 182:
-        print('right')   
+    elif which_key & 0xFF == ord('d'):
         car.motor_right(30)            
-    elif which_key & 0xFF == 181:
+    elif which_key & 0xFF == ord(' '):
         car.motor_stop()
         enable_AIdrive = False   
         is_emergency_stop = False  
-        print('stop')   
-    elif which_key & 0xFF == ord('q'):  
+    elif which_key & 0xFF == ord('q'):
         car.motor_stop()
-        print('exit')   
         enable_AIdrive = False     
         is_exit = True    
-        print('enable_AIdrive: ', enable_AIdrive)          
-    elif which_key & 0xFF == ord('e'):  
+    elif which_key & 0xFF == ord('e'):
         enable_AIdrive = True
-        print('enable_AIdrive: ', enable_AIdrive)        
-    elif which_key & 0xFF == ord('w'):  
+    elif which_key & 0xFF == ord('x'):
         enable_AIdrive = False
         is_emergency_stop = False
         car.motor_stop()
-        print('enable_AIdrive 2: ', enable_AIdrive)   
-    elif which_key & 0xFF == ord('t'):  
+    elif which_key & 0xFF == ord('t'):
         enable_OD = True
-        print('enable_OD: ', enable_OD)
-        if global_frame is not None:
-            print(f"ID of global_frame after 't': {id(global_frame)}")
-    elif which_key & 0xFF == ord('r'):  
+    elif which_key & 0xFF == ord('r'):
         enable_OD = False
-        print('enable_OD: ', enable_OD)
     return is_exit  
 
 def drive_AI(img):
-    #print('id', id(model))
-    global car
-    global model
-    global is_emergency_stop
+    global car, model, is_emergency_stop
     
     img = np.expand_dims(img, 0)
     res = model.predict(img)[0]
-    #print('res', res)
     steering_angle = np.argmax(np.array(res))
-    print('steering_angle', steering_angle)
     
-    if is_emergency_stop == True:
+    if is_emergency_stop:
         return
     
     if steering_angle == 0:
-        print("go")
-        speedSet = 60
-        car.motor_go(speedSet)
+        car.motor_go(60)
     elif steering_angle == 1:
-        print("left")
-        speedSet = 20
-        car.motor_left(speedSet)          
+        car.motor_left(20)          
     elif steering_angle == 2:
-        print("right")
-        speedSet = 20
-        car.motor_right(speedSet)
-    else:
-        print("This cannot be entered")
+        car.motor_right(20)
 
 def object_detection_thread():
-    global OD_MODEL
-    global car
-    global is_emergency_stop
-    global global_frame
-    global OD_frame_lock
-    global is_running
-    global enable_OD
-    global frame_counter
-    global detection_interval
-    
-    while is_running:
-        if enable_OD == False:
-            time.sleep(0.1) 
-            cv2.destroyWindow('OD Tracking Camera')
-            continue 
+    global OD_MODEL, car, is_emergency_stop, global_frame
+    global OD_frame_lock, is_running, enable_OD, frame_counter, detection_interval
 
-        OD_frame_lock.acquire()
-        if global_frame is None:
-            OD_frame_lock.release()
+    while is_running:
+        if not enable_OD:
+            time.sleep(0.05)
+            continue
+
+        with OD_frame_lock:
+            if global_frame is None:
+                frame_to_process = None
+            else:
+                frame_to_process = global_frame.copy()
+
+        if frame_to_process is None:
             time.sleep(0.01)
             continue
-            
+
         frame_counter += 1
-        
         if frame_counter % detection_interval != 0:
-            frame_to_display = global_frame.copy() 
-            OD_frame_lock.release()
-            
-            cv2.imshow('OD Tracking Camera', frame_to_display) 
-            cv2.waitKey(1)
+            time.sleep(0.005)
             continue
 
-        frame_counter = 0 
-        frame_to_process = global_frame.copy() # 깊은 복사 유지
-        OD_frame_lock.release()
+        frame_counter = 0
 
-        print(f"ID of frame_to_process (OD Thread): {id(frame_to_process)}")
-
-        blob = cv2.dnn.blobFromImage(image=frame_to_process, size=(300, 300), swapRB=True)
+        blob = cv.dnn.blobFromImage(image=frame_to_process, size=(300, 300), swapRB=True)
         OD_MODEL.setInput(blob)
         output = OD_MODEL.forward()
 
-        frame_height, frame_width, _ = frame_to_process.shape
+        h, w, _ = frame_to_process.shape
         object_is_currently_visible = False
-        
+
         for detection in output[0, 0, :, :]:
-            confidence = detection[2]
-            if confidence > 0.4: 
-                class_id = int(detection[1])
-                if 0 < class_id <= len(OD_CLASS_NAMES):
-                    class_name = OD_CLASS_NAMES[class_id - 1]
-                    color = (0, 255, 0)
-                    x_min = detection[3] * frame_width
-                    y_min = detection[4] * frame_height
-                    x_max = detection[5] * frame_width
-                    y_max = detection[6] * frame_height
+            confidence = float(detection[2])
+            if confidence < 0.5:
+                continue
+            class_id = int(detection[1])
+            if 0 < class_id <= len(OD_CLASS_NAMES):
+                class_name = OD_CLASS_NAMES[class_id - 1]
+            else:
+                continue
 
-                    label = f"{class_name}: {confidence:.2f}"
-                    
-                    if class_name in STOP_CLASSES:
-                        object_is_currently_visible = True
-                        color = (0, 0, 255)
+            x_min = int(detection[3] * w)
+            y_min = int(detection[4] * h)
+            x_max = int(detection[5] * w)
+            y_max = int(detection[6] * h)
 
-                    cv2.rectangle(frame_to_process, (int(x_min), int(y_min)), (int(x_max), int(y_max)), color, thickness=2)
-                    cv2.putText(frame_to_process, label, (int(x_min), int(y_min - 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
-                    
-                    if object_is_currently_visible:
-                        break
+            if class_name in STOP_CLASSES:
+                object_is_currently_visible = True
+                cv.rectangle(frame_to_process, (x_min, y_min), (x_max, y_max), (0, 0, 255), 2)
+                cv.putText(frame_to_process, f"{class_name}: {confidence:.2f}", (x_min, max(0, y_min - 10)), cv.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+                break
 
-        if object_is_currently_visible:
-            if is_emergency_stop == False:
-                car.motor_stop()
-                is_emergency_stop = True
-        elif is_emergency_stop == True:
+        if object_is_currently_visible and not is_emergency_stop:
+            car.motor_stop()
+            is_emergency_stop = True
+        elif not object_is_currently_visible and is_emergency_stop:
             is_emergency_stop = False
 
-        OD_frame_lock.acquire()
-        global_frame = frame_to_process.copy() 
-        OD_frame_lock.release()
-        
-        cv2.imshow('OD Tracking Camera', frame_to_process) 
-        cv2.waitKey(1)
+        with OD_frame_lock:
+            global_frame = frame_to_process
 
         time.sleep(0.01)
-        
+
 def main():
-    global global_frame
-    global OD_frame_lock
-    global is_emergency_stop
-    global is_running
+    global global_frame, OD_frame_lock, is_emergency_stop, is_running
     
     camera = cv.VideoCapture(0)
-    camera.set(cv.CAP_PROP_FRAME_WIDTH,v_x) 
-    camera.set(cv.CAP_PROP_FRAME_HEIGHT,v_y)
+    camera.set(cv.CAP_PROP_FRAME_WIDTH, v_x) 
+    camera.set(cv.CAP_PROP_FRAME_HEIGHT, v_y)
     
     try:
-        while( camera.isOpened() ):
+        while camera.isOpened() and is_running:
             ret, frame = camera.read()
-            frame = cv.flip(frame,-1)
+            if not ret:
+                break
+            frame = cv.flip(frame, -1)
             
-            OD_frame_lock.acquire()
-            global_frame = frame.copy() 
-            OD_frame_lock.release()
-            
-            OD_frame_lock.acquire()
-            frame_to_display = global_frame.copy() 
-            OD_frame_lock.release()
+            with OD_frame_lock:
+                global_frame = frame.copy()
+                frame_to_display = global_frame.copy()
             
             currently_stopped = is_emergency_stop
             
-            cv.imshow('camera',frame_to_display)
+            cv.imshow('camera', frame_to_display)
             
-            # image processing start here
-            crop_img = frame_to_display[int(v_y/2):,:]
+            crop_img = frame_to_display[int(v_y/2):, :]
             crop_img = cv.resize(crop_img, (200, 66))
-            cv.imshow('crop_img ', cv.resize(crop_img, dsize=(0,0), fx=2, fy=2))
+            norm_img = cv.cvtColor(crop_img, cv.COLOR_BGR2RGB).astype(np.float32) / 255.0
+            cv.imshow('crop_img', cv.resize(crop_img, dsize=(0,0), fx=2, fy=2))
 
-            if enable_AIdrive == True and currently_stopped == False:
-                drive_AI(crop_img)
+            if enable_AIdrive and not currently_stopped:
+                drive_AI(norm_img)
 
-            # image processing end here
-            is_exit = False
             which_key = cv.waitKey(20)
             if which_key > 0:
                 is_exit = key_cmd(which_key)    
-            if is_exit is True:
-                cv.destroyAllWindows()
-                break
+                if is_exit:
+                    break
 
     except Exception as e:
         exception_type, exception_object, exception_traceback = sys.exc_info()
         filename = exception_traceback.tb_frame.f_code.co_filename
         line_number = exception_traceback.tb_lineno
+        print("Exception type:", exception_type)
+        print("File name:", filename)
+        print("Line number:", line_number)
 
-        print("Exception type: ", exception_type)
-        print("File name: ", filename)
-        print("Line number: ", line_number)
-        global is_running
-        is_running = False
+    finally:
+        camera.release()
+        cv.destroyAllWindows()
 
 if __name__ == '__main__':
-
     v_x = 320
     v_y = 240
     v_x_grid = [int(v_x*i/10) for i in range(1, 10)]
     print(v_x_grid)
-    moment = np.array([0, 0, 0])
 
     model_path = 'modul/lane_navigation_20251127_1059.h5'
     model = load_model(model_path)
@@ -270,17 +202,21 @@ if __name__ == '__main__':
         config='modul/ssd_mobilenet_v2_coco_2018_03_29.pbtxt'
     )
 
-    t_task1 = threading.Thread(target = func_thread)
-    t_task1.start()
-    
-    t_od = threading.Thread(target = object_detection_thread)
-    t_od.start()
-
     car = SDcar.Drive()
-    
+
     is_running = True
     enable_AIdrive = False
-    main() 
+    enable_OD = False
+
+    t_task1 = threading.Thread(target=func_thread, daemon=True)
+    t_task1.start()
+    
+    t_od = threading.Thread(target=object_detection_thread, daemon=True)
+    t_od.start()
+
+    main()
+
     is_running = False
     car.clean_GPIO()
+    cv.destroyAllWindows()
     print('end vis')

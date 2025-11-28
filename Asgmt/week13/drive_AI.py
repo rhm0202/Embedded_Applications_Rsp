@@ -13,6 +13,9 @@ enable_AIdrive = False
 global_frame = None 
 OD_frame_lock = threading.Lock()
 
+no_object_counter = 0
+NO_OBJECT_THRESHOLD = 10
+
 detection_interval = 1
 frame_counter = 0
 OD_CLASS_NAMES = []
@@ -68,7 +71,7 @@ def drive_AI(img):
 
 def object_detection_thread():
     global car, is_emergency_stop, global_frame
-    global OD_frame_lock, is_running, enable_OD, frame_counter
+    global OD_frame_lock, is_running, enable_OD, frame_counter, no_object_counter
 
     OD_MODEL = cv.dnn.readNetFromTensorflow(
         model='modul/frozen_inference_graph.pb',
@@ -106,7 +109,7 @@ def object_detection_thread():
 
         for detection in output[0, 0, :, :]:
             confidence = float(detection[2])
-            if confidence < 0.5:
+            if confidence < 0.3:
                 continue
             class_id = int(detection[1])
             if 0 < class_id <= len(OD_CLASS_NAMES):
@@ -134,8 +137,12 @@ def object_detection_thread():
         if object_is_currently_visible and not is_emergency_stop:
             car.motor_stop()
             is_emergency_stop = True
+            no_object_counter = 0
         elif not object_is_currently_visible and is_emergency_stop:
-            is_emergency_stop = False
+            no_object_counter += 1
+            if no_object_counter >= NO_OBJECT_THRESHOLD:
+                is_emergency_stop = False
+                no_object_counter = 0
 
         with OD_frame_lock:
             global_frame = frame_to_process
@@ -180,7 +187,7 @@ if __name__ == '__main__':
     v_y = 240
     v_x_grid = [int(v_x*i/10) for i in range(1, 10)]
     print(v_x_grid)
-    model_path = 'modul/lane_navigation_20251128_1838.h5'
+    model_path = 'modul/lane_navigation_20251128_1726.h5'
     model = load_model(model_path)
     car = SDcar.Drive()
     is_running = True

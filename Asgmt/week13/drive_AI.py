@@ -73,55 +73,7 @@ def key_cmd(which_key):
         print('enable_AIdrive 2: ', enable_AIdrive)   
 
     return is_exit  
-    B = frame[:,:,0]
-    G = frame[:,:,1]
-    R = frame[:,:,2]
-    Y = np.zeros_like(G, np.uint8)
-    # need to tune params
-    Y = G*0.5 + R*0.5 - B*0.7 # 연산 수행 시 float64로 바뀜
-    Y = Y.astype(np.uint8)
-    Y = cv.GaussianBlur(Y, (5,5), cv.BORDER_DEFAULT)
-    # need to tune params
-    _, mask_Y = cv.threshold(Y, 100, 255, cv.THRESH_BINARY)
-    return mask_Y
 
-def line_tracing(cx):
-    #print('cx, ', cx)
-    #print('v_x_grid', v_x_grid)
-    global moment
-    global v_x
-    global car
-    tolerance = 0.1
-    diff = 0
-
-    if moment[0] != 0 and moment[1] != 0 and moment[2] != 0:
-        avg_m = np.mean(moment)
-        diff = np.abs(avg_m - cx) / v_x
-    
-    #print('diff ={:.4f}'.format(diff))
-
-    if diff <= tolerance:
-
-        moment[0] = moment[1]
-        moment[1] = moment[2]
-        moment[2] = cx
-        print('cx : ', cx)
-        if v_x_grid[2] <= cx < v_x_grid[4]:
-            car.motor_go(speed) 
-            print('go')
-        elif v_x_grid[3] >= cx:
-            car.motor_left(30) 
-            print('turn left')
-        elif v_x_grid[1] <= cx:
-            car.motor_right(30) 
-            print('turn right')
-        else:
-            print("skip")    
-        
-    else:
-        car.motor_go(speed) 
-        print('go')    
-        moment = [0,0,0]
 
 def drive_AI(img):
     global car

@@ -16,6 +16,9 @@ is_running = False
 global_frame = None 
 OD_frame_lock = threading.Lock()
 
+detection_interval = 5
+frame_counter = 0
+
 OD_CLASS_NAMES = []
 with open('modul/object_detection_classes_coco.txt', 'r') as f: 
     OD_CLASS_NAMES = f.read().split('\n')
@@ -70,13 +73,14 @@ def key_cmd(which_key):
         is_emergency_stop = False
         car.motor_stop()
         print('enable_AIdrive 2: ', enable_AIdrive)   
-    elif which_key & 0xFF == ord('t'):
+    elif which_key & 0xFF == ord('t'):  
         enable_OD = True
         print('enable_OD: ', enable_OD)
-    elif which_key & 0xFF == ord('r'):
+        if global_frame is not None:
+            print(f"ID of global_frame after 't': {id(global_frame)}")
+    elif which_key & 0xFF == ord('r'):  
         enable_OD = False
         print('enable_OD: ', enable_OD)
-
     return is_exit  
 
 def drive_AI(img):
@@ -117,11 +121,14 @@ def object_detection_thread():
     global OD_frame_lock
     global is_running
     global enable_OD
+    global frame_counter
+    global detection_interval
     
     while is_running:
         if enable_OD == False:
             time.sleep(0.1) 
-            continue
+            cv2.destroyWindow('OD Tracking Camera')
+            continue 
 
         OD_frame_lock.acquire()
         if global_frame is None:
@@ -129,26 +136,35 @@ def object_detection_thread():
             time.sleep(0.01)
             continue
             
-        frame_to_process = global_frame.copy() 
+        frame_counter += 1
+        
+        if frame_counter % detection_interval != 0:
+            frame_to_display = global_frame.copy() 
+            OD_frame_lock.release()
+            
+            cv2.imshow('OD Tracking Camera', frame_to_display) 
+            cv2.waitKey(1)
+            continue
+
+        frame_counter = 0 
+        frame_to_process = global_frame.copy() # 깊은 복사 유지
         OD_frame_lock.release()
 
-        blob = cv.dnn.blobFromImage(image=frame_to_process, size=(300, 300), swapRB=True)
+        print(f"ID of frame_to_process (OD Thread): {id(frame_to_process)}")
+
+        blob = cv2.dnn.blobFromImage(image=frame_to_process, size=(300, 300), swapRB=True)
         OD_MODEL.setInput(blob)
         output = OD_MODEL.forward()
-        
+
         frame_height, frame_width, _ = frame_to_process.shape
-        
         object_is_currently_visible = False
         
         for detection in output[0, 0, :, :]:
             confidence = detection[2]
-            
             if confidence > 0.4: 
                 class_id = int(detection[1])
-                
                 if 0 < class_id <= len(OD_CLASS_NAMES):
                     class_name = OD_CLASS_NAMES[class_id - 1]
-
                     color = (0, 255, 0)
                     x_min = detection[3] * frame_width
                     y_min = detection[4] * frame_height
@@ -161,27 +177,27 @@ def object_detection_thread():
                         object_is_currently_visible = True
                         color = (0, 0, 255)
 
-                    cv.rectangle(frame_to_process, (int(x_min), int(y_min)), (int(x_max), int(y_max)), color, thickness=2)
-                    cv.putText(frame_to_process, label, (int(x_min), int(y_min - 10)), cv.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
+                    cv2.rectangle(frame_to_process, (int(x_min), int(y_min)), (int(x_max), int(y_max)), color, thickness=2)
+                    cv2.putText(frame_to_process, label, (int(x_min), int(y_min - 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
                     
                     if object_is_currently_visible:
                         break
 
-        # ========== Emergency Stop Logic ==========
         if object_is_currently_visible:
             if is_emergency_stop == False:
                 car.motor_stop()
                 is_emergency_stop = True
-        
         elif is_emergency_stop == True:
             is_emergency_stop = False
 
-        # 시각화 결과가 포함된 프레임을 메인 스레드와 공유
         OD_frame_lock.acquire()
-        global_frame = frame_to_process
+        global_frame = frame_to_process.copy() 
         OD_frame_lock.release()
+        
+        cv2.imshow('OD Tracking Camera', frame_to_process) 
+        cv2.waitKey(1)
 
-        time.sleep(0.1)
+        time.sleep(0.01)
         
 def main():
     global global_frame

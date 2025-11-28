@@ -1,14 +1,10 @@
 import cv2 as cv
 import numpy as np
-import threading, time
-import sys
-import tensorflow as tf
+import threading, time, sys
 from tensorflow.keras.models import load_model
 from modul import SDcar
 
 speed = 80
-epsilon = 0.0001
-
 is_emergency_stop = False 
 enable_OD = False        
 is_running = False 
@@ -23,13 +19,11 @@ OD_CLASS_NAMES = []
 with open('modul/object_detection_classes_coco.txt', 'r') as f: 
     OD_CLASS_NAMES = [ln.strip() for ln in f if ln.strip()]
 
-OD_MODEL = None 
-STOP_CLASSES = ['mouse', 'cell phone']
+STOP_CLASSES = ['person', 'stop sign']  # 실제 주행용으로 적절한 클래스 지정
 
 def key_cmd(which_key):
     global enable_AIdrive, is_emergency_stop, enable_OD, car
     is_exit = False 
-
     if which_key & 0xFF == ord('w'):
         car.motor_go(speed)
     elif which_key & 0xFF == ord('s'):
@@ -60,14 +54,11 @@ def key_cmd(which_key):
 
 def drive_AI(img):
     global car, model, is_emergency_stop
-    
     img = np.expand_dims(img, 0)
     res = model.predict(img)[0]
     steering_angle = np.argmax(np.array(res))
-    
     if is_emergency_stop:
         return
-    
     if steering_angle == 0:
         car.motor_go(60)
     elif steering_angle == 1:
@@ -76,8 +67,13 @@ def drive_AI(img):
         car.motor_right(20)
 
 def object_detection_thread():
-    global OD_MODEL, car, is_emergency_stop, global_frame
-    global OD_frame_lock, is_running, enable_OD, frame_counter, detection_interval
+    global car, is_emergency_stop, global_frame
+    global OD_frame_lock, is_running, enable_OD, frame_counter
+
+    OD_MODEL = cv.dnn.readNetFromTensorflow(
+        model='modul/frozen_inference_graph.pb',
+        config='modul/ssd_mobilenet_v2_coco_2018_03_29.pbtxt'
+    )
 
     while is_running:
         if not enable_OD:
@@ -98,7 +94,6 @@ def object_detection_thread():
         if frame_counter % detection_interval != 0:
             time.sleep(0.005)
             continue
-
         frame_counter = 0
 
         blob = cv.dnn.blobFromImage(image=frame_to_process, size=(300, 300), swapRB=True)
@@ -106,6 +101,7 @@ def object_detection_thread():
         output = OD_MODEL.forward()
 
         h, w, _ = frame_to_process.shape
+        detected_texts = []
         object_is_currently_visible = False
 
         for detection in output[0, 0, :, :]:
@@ -123,11 +119,17 @@ def object_detection_thread():
             x_max = int(detection[5] * w)
             y_max = int(detection[6] * h)
 
+            detected_texts.append(class_name)
+            color = (0, 255, 0)
             if class_name in STOP_CLASSES:
                 object_is_currently_visible = True
-                cv.rectangle(frame_to_process, (x_min, y_min), (x_max, y_max), (0, 0, 255), 2)
-                cv.putText(frame_to_process, f"{class_name}: {confidence:.2f}", (x_min, max(0, y_min - 10)), cv.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
-                break
+                color = (0, 0, 255)
+
+            cv.rectangle(frame_to_process, (x_min, y_min), (x_max, y_max), color, 2)
+            cv.putText(frame_to_process, f"{class_name}:{confidence:.2f}", (x_min, max(0, y_min - 10)), cv.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
+
+        if detected_texts:
+            cv.putText(frame_to_process, "Detected: " + ", ".join(detected_texts),(10, 30), cv.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 0), 2)
 
         if object_is_currently_visible and not is_emergency_stop:
             car.motor_stop()
@@ -138,52 +140,37 @@ def object_detection_thread():
         with OD_frame_lock:
             global_frame = frame_to_process
 
+        cv.imshow('OD camera', frame_to_process)
+        cv.waitKey(1)
         time.sleep(0.01)
 
 def main():
     global global_frame, OD_frame_lock, is_emergency_stop, is_running
-    
     camera = cv.VideoCapture(0)
     camera.set(cv.CAP_PROP_FRAME_WIDTH, v_x) 
     camera.set(cv.CAP_PROP_FRAME_HEIGHT, v_y)
-    
     try:
         while camera.isOpened() and is_running:
             ret, frame = camera.read()
             if not ret:
                 break
             frame = cv.flip(frame, -1)
-            
             with OD_frame_lock:
                 global_frame = frame.copy()
                 frame_to_display = global_frame.copy()
-            
             currently_stopped = is_emergency_stop
-            
             cv.imshow('camera', frame_to_display)
-            
             crop_img = frame_to_display[int(v_y/2):, :]
             crop_img = cv.resize(crop_img, (200, 66))
             norm_img = cv.cvtColor(crop_img, cv.COLOR_BGR2RGB).astype(np.float32) / 255.0
             cv.imshow('crop_img', cv.resize(crop_img, dsize=(0,0), fx=2, fy=2))
-
             if enable_AIdrive and not currently_stopped:
                 drive_AI(norm_img)
-
             which_key = cv.waitKey(20)
             if which_key > 0:
                 is_exit = key_cmd(which_key)    
                 if is_exit:
                     break
-
-    except Exception as e:
-        exception_type, exception_object, exception_traceback = sys.exc_info()
-        filename = exception_traceback.tb_frame.f_code.co_filename
-        line_number = exception_traceback.tb_lineno
-        print("Exception type:", exception_type)
-        print("File name:", filename)
-        print("Line number:", line_number)
-
     finally:
         camera.release()
         cv.destroyAllWindows()
@@ -193,29 +180,15 @@ if __name__ == '__main__':
     v_y = 240
     v_x_grid = [int(v_x*i/10) for i in range(1, 10)]
     print(v_x_grid)
-
     model_path = 'modul/lane_navigation_20251127_1059.h5'
     model = load_model(model_path)
-    
-    OD_MODEL = cv.dnn.readNetFromTensorflow(
-        model='modul/frozen_inference_graph.pb',
-        config='modul/ssd_mobilenet_v2_coco_2018_03_29.pbtxt'
-    )
-
     car = SDcar.Drive()
-
     is_running = True
     enable_AIdrive = False
     enable_OD = False
-
-    t_task1 = threading.Thread(target=func_thread, daemon=True)
-    t_task1.start()
-    
     t_od = threading.Thread(target=object_detection_thread, daemon=True)
     t_od.start()
-
     main()
-
     is_running = False
     car.clean_GPIO()
     cv.destroyAllWindows()

@@ -1,7 +1,7 @@
 import cv2 as cv
 import numpy as np
 import threading, time
-import SDcar 
+from modul import SDcar 
 import sys
 import tensorflow as tf
 from tensorflow.keras.models import load_model

@@ -9,6 +9,8 @@ from tensorflow.keras.models import load_model
 speed = 80
 epsilon = 0.0001
 
+is_emergency_stop = False
+
 OD_CLASS_NAMES = []
 with open('modul/object_detection_classes_coco.txt', 'r') as f:
     OD_CLASS_NAMES = f.read().split('\n')
@@ -162,19 +164,19 @@ def drive_AI(img):
 def run_object_detection(frame):
     global OD_MODEL
     global car
-    global enable_AIdrive
+    global is_emergency_stop
     
     if OD_MODEL is None:
         cv.imshow('camera', frame)
-        return
-        
+        return False 
+
     blob = cv.dnn.blobFromImage(image=frame, size=(300, 300), swapRB=True)
     OD_MODEL.setInput(blob)
     output = OD_MODEL.forward()
     
     frame_height, frame_width, _ = frame.shape
     
-    is_object_detected = False
+    object_is_currently_visible = False
     
     for detection in output[0, 0, :, :]:
         confidence = detection[2]
@@ -186,21 +188,27 @@ def run_object_detection(frame):
                 class_name = OD_CLASS_NAMES[class_id - 1]
                 
                 if class_name in STOP_CLASSES:
-                    is_object_detected = True
-
-                    car.motor_stop()
-                    enable_AIdrive = False
+                    object_is_currently_visible = True
+                    
+                    if is_emergency_stop == False:
+                        car.motor_stop()
+                        is_emergency_stop = True
                     
                     color = (0, 0, 255) 
                     x_min = detection[3] * frame_width
                     y_min = detection[4] * frame_height
                     x_max = detection[5] * frame_width
                     y_max = detection[6] * frame_height
-                    cv.rectangle(frame, (int(x_min), int(y_min)), (int(x_max), int(y_max)), color, thickness=2)
+                    cv.rectangle(frame, (int(x_min), int(box_y)), (int(x_max), int(y_max)), color, thickness=2)
                     cv.putText(frame, class_name, (int(x_min), int(y_min - 10)), cv.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
                     
-                    break 
+                    break
+
+    if object_is_currently_visible == False and is_emergency_stop == True:
+        is_emergency_stop = False
+    
     cv.imshow('camera', frame)
+    return is_emergency_stop
     
 def main():
     camera = cv.VideoCapture(0)
@@ -211,14 +219,14 @@ def main():
         while( camera.isOpened() ):
             ret, frame = camera.read()
             frame = cv.flip(frame,-1)
-            run_object_detection(frame)
+            currently_stopped = run_object_detection(frame)
             
             # image processing start here
             crop_img = frame[int(v_y/2):,:]
             crop_img = cv.resize(crop_img, (200, 66))
             cv.imshow('crop_img ', cv.resize(crop_img, dsize=(0,0), fx=2, fy=2))
 
-            if enable_AIdrive == True:
+            if enable_AIdrive == True and currently_stopped == False: 
                 drive_AI(crop_img)
 
             # image processing end here

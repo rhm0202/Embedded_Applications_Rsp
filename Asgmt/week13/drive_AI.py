@@ -181,10 +181,11 @@ def main():
     camera = cv.VideoCapture(0)
     camera.set(cv.CAP_PROP_FRAME_WIDTH,v_x) 
     camera.set(cv.CAP_PROP_FRAME_HEIGHT,v_y)
+    
     if not camera.isOpened():
-        print("Error: Camera failed to open. Check index or connection.")
-        is_running = False
-        return
+        print("Error: Camera failed to open. Check index or connection.")
+        is_running = False
+        return
     
     try:
         while( camera.isOpened() ):

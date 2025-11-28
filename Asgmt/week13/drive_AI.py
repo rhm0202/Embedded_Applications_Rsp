@@ -119,9 +119,13 @@ def object_detection_thread():
         frame_to_process = global_frame.copy() 
         OD_frame_lock.release()
         
+        print("OD: Frame processing started.")
+        
         blob = cv.dnn.blobFromImage(image=frame_to_process, size=(300, 300), swapRB=True)
         OD_MODEL.setInput(blob)
         output = OD_MODEL.forward()
+        
+        print("OD: Model Inference completed.")
         
         frame_height, frame_width, _ = frame_to_process.shape
         
@@ -161,7 +165,7 @@ def object_detection_thread():
         global_frame = frame_to_process
         OD_frame_lock.release()
 
-        time.sleep(0.1)
+        time.sleep(0.001)
     
 def main():
     global global_frame

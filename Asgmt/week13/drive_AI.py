@@ -111,6 +111,7 @@ def object_detection_thread():
     
     while is_running:
         OD_frame_lock.acquire()
+        
         if global_frame is None:
             OD_frame_lock.release()
             time.sleep(0.01)
@@ -185,10 +186,11 @@ def main():
             
             OD_frame_lock.acquire()
             global_frame = frame.copy()
-            
+            OD_frame_lock.release()
+
+            OD_frame_lock.acquire()
             frame_to_display = global_frame.copy() 
             OD_frame_lock.release()
-            
             currently_stopped = is_emergency_stop
             
             cv.imshow('camera',frame_to_display)

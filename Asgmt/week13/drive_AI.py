@@ -9,6 +9,13 @@ from tensorflow.keras.models import load_model
 speed = 80
 epsilon = 0.0001
 
+OD_CLASS_NAMES = []
+with open('modul/object_detection_classes_coco.txt', 'r') as f:
+    OD_CLASS_NAMES = f.read().split('\n')
+
+OD_MODEL = None 
+STOP_CLASSES = ['mouse', 'cell phone']
+
 def func_thread():
     i = 0
     while True:
@@ -152,6 +159,49 @@ def drive_AI(img):
     else:
         print("This cannot be entered")
 
+def run_object_detection(frame):
+    global OD_MODEL
+    global car
+    global enable_AIdrive
+    
+    if OD_MODEL is None:
+        cv.imshow('camera', frame)
+        return
+        
+    blob = cv.dnn.blobFromImage(image=frame, size=(300, 300), swapRB=True)
+    OD_MODEL.setInput(blob)
+    output = OD_MODEL.forward()
+    
+    frame_height, frame_width, _ = frame.shape
+    
+    is_object_detected = False
+    
+    for detection in output[0, 0, :, :]:
+        confidence = detection[2]
+        
+        if confidence > 0.4:
+            class_id = int(detection[1])
+            
+            if 0 < class_id <= len(OD_CLASS_NAMES):
+                class_name = OD_CLASS_NAMES[class_id - 1]
+                
+                if class_name in STOP_CLASSES:
+                    is_object_detected = True
+
+                    car.motor_stop()
+                    enable_AIdrive = False
+                    
+                    color = (0, 0, 255) 
+                    x_min = detection[3] * frame_width
+                    y_min = detection[4] * frame_height
+                    x_max = detection[5] * frame_width
+                    y_max = detection[6] * frame_height
+                    cv.rectangle(frame, (int(x_min), int(y_min)), (int(x_max), int(y_max)), color, thickness=2)
+                    cv.putText(frame, class_name, (int(x_min), int(y_min - 10)), cv.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
+                    
+                    break 
+    cv.imshow('camera', frame)
+    
 def main():
     camera = cv.VideoCapture(0)
     camera.set(cv.CAP_PROP_FRAME_WIDTH,v_x) 
@@ -161,7 +211,8 @@ def main():
         while( camera.isOpened() ):
             ret, frame = camera.read()
             frame = cv.flip(frame,-1)
-            cv.imshow('camera',frame)
+            run_object_detection(frame)
+            
             # image processing start here
             crop_img = frame[int(v_y/2):,:]
             crop_img = cv.resize(crop_img, (200, 66))
@@ -202,10 +253,12 @@ if __name__ == '__main__':
 
     
     model = load_model(model_path)
-    '''print('id', id(model))
-    print(model.summary())'''
+    
 
-    #test_fun(model)
+    OD_MODEL = cv.dnn.readNetFromTensorflow(
+        model='modul/frozen_inference_graph.pb',
+        config='modul/ssd_mobilenet_v2_coco_2018_03_29.pbtxt'
+    )
 
     t_task1 = threading.Thread(target = func_thread)
     t_task1.start()

@@ -161,7 +161,7 @@ def object_detection_thread():
         global_frame = frame_to_process
         OD_frame_lock.release()
 
-        time.sleep(0.01)
+        time.sleep(0.1)
     
 def main():
     global global_frame

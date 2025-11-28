@@ -13,7 +13,7 @@ enable_AIdrive = False
 global_frame = None 
 OD_frame_lock = threading.Lock()
 
-detection_interval = 5
+detection_interval = 1
 frame_counter = 0
 OD_CLASS_NAMES = []
 with open('modul/object_detection_classes_coco.txt', 'r') as f: 

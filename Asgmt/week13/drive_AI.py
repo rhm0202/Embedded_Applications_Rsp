@@ -199,7 +199,7 @@ def run_object_detection(frame):
                     y_min = detection[4] * frame_height
                     x_max = detection[5] * frame_width
                     y_max = detection[6] * frame_height
-                    cv.rectangle(frame, (int(x_min), int(box_y)), (int(x_max), int(y_max)), color, thickness=2)
+                    cv.rectangle(frame, (int(x_min), int(y_min)), (int(x_max), int(y_max)), color, thickness=2)
                     cv.putText(frame, class_name, (int(x_min), int(y_min - 10)), cv.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
                     
                     break

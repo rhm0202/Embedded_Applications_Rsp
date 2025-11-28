@@ -4,7 +4,7 @@ import threading, time, sys
 from tensorflow.keras.models import load_model
 from modul import SDcar
 
-speed = 80
+speed = 20
 is_emergency_stop = False 
 enable_OD = False        
 is_running = False 

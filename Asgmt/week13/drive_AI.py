@@ -21,7 +21,7 @@ with open('modul/object_detection_classes_coco.txt', 'r') as f:
 OD_MODEL = None 
 STOP_CLASSES = ['mouse', 'cell phone']
 
-def func_thread()
+def func_thread():
     global is_running
     i = 0
     while True:

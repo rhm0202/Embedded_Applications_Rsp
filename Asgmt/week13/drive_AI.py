@@ -187,7 +187,7 @@ if __name__ == '__main__':
     v_y = 240
     v_x_grid = [int(v_x*i/10) for i in range(1, 10)]
     print(v_x_grid)
-    model_path = 'modul/lane_navigation_20251128_1838.h5'
+    model_path = 'modul/lane_navigation_20251127_1059.h5'
     model = load_model(model_path)
     car = SDcar.Drive()
     is_running = True

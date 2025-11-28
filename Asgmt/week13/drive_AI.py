@@ -1,7 +1,7 @@
 import cv2 as cv
 import numpy as np
 import threading, time
-from modul import SDcar 
+import SDcar 
 import sys
 import tensorflow as tf
 from tensorflow.keras.models import load_model
@@ -9,23 +9,24 @@ from tensorflow.keras.models import load_model
 speed = 80
 epsilon = 0.0001
 
-is_emergency_stop = False
+is_emergency_stop = False 
+enable_OD = False        
+is_running = False 
 
 global_frame = None 
 OD_frame_lock = threading.Lock()
 
 OD_CLASS_NAMES = []
-with open('modul/object_detection_classes_coco.txt', 'r') as f:
+with open('modul/object_detection_classes_coco.txt', 'r') as f: 
     OD_CLASS_NAMES = f.read().split('\n')
 
 OD_MODEL = None 
 STOP_CLASSES = ['mouse', 'cell phone']
 
 def func_thread():
-    global is_running
+    global is_running # [수정] global is_running 선언 추가
     i = 0
     while True:
-        #print("alive!!")    
         time.sleep(1)
         i = i+1
         if is_running is False:
@@ -34,10 +35,9 @@ def func_thread():
 def key_cmd(which_key):
     print('which_key', which_key)
     is_exit = False 
-    
     global enable_AIdrive
     global is_emergency_stop
-    global car
+    global enable_OD
     
     if which_key & 0xFF == 184:
         print('up')
@@ -53,8 +53,8 @@ def key_cmd(which_key):
         car.motor_right(30)            
     elif which_key & 0xFF == 181:
         car.motor_stop()
-        enable_AIdrive = False
-        is_emergency_stop = False     
+        enable_AIdrive = False   
+        is_emergency_stop = False  
         print('stop')   
     elif which_key & 0xFF == ord('q'):  
         car.motor_stop()
@@ -64,26 +64,35 @@ def key_cmd(which_key):
         print('enable_AIdrive: ', enable_AIdrive)          
     elif which_key & 0xFF == ord('e'):  
         enable_AIdrive = True
-        is_emergency_stop = False
         print('enable_AIdrive: ', enable_AIdrive)        
     elif which_key & 0xFF == ord('w'):  
         enable_AIdrive = False
         is_emergency_stop = False
         car.motor_stop()
         print('enable_AIdrive 2: ', enable_AIdrive)   
+    elif which_key & 0xFF == ord('t'):
+        enable_OD = True
+        print('enable_OD: ', enable_OD)
+    elif which_key & 0xFF == ord('r'):
+        enable_OD = False
+        print('enable_OD: ', enable_OD)
 
     return is_exit  
 
-
 def drive_AI(img):
+    #print('id', id(model))
     global car
     global model
+    global is_emergency_stop
     
     img = np.expand_dims(img, 0)
     res = model.predict(img)[0]
-    
+    #print('res', res)
     steering_angle = np.argmax(np.array(res))
     print('steering_angle', steering_angle)
+    
+    if is_emergency_stop == True:
+        return
     
     if steering_angle == 0:
         print("go")
@@ -107,27 +116,25 @@ def object_detection_thread():
     global global_frame
     global OD_frame_lock
     global is_running
-    
+    global enable_OD
     
     while is_running:
+        if enable_OD == False:
+            time.sleep(0.1) 
+            continue
+
         OD_frame_lock.acquire()
-        
         if global_frame is None:
             OD_frame_lock.release()
             time.sleep(0.01)
-            print("OD: Waiting for frame...")
             continue
             
         frame_to_process = global_frame.copy() 
         OD_frame_lock.release()
-        
-        print("OD: Frame processing started.")
-        
+
         blob = cv.dnn.blobFromImage(image=frame_to_process, size=(300, 300), swapRB=True)
         OD_MODEL.setInput(blob)
         output = OD_MODEL.forward()
-        
-        print("OD: Model Inference completed.")
         
         frame_height, frame_width, _ = frame_to_process.shape
         
@@ -136,56 +143,55 @@ def object_detection_thread():
         for detection in output[0, 0, :, :]:
             confidence = detection[2]
             
-            if confidence > 0.4:
+            if confidence > 0.4: 
                 class_id = int(detection[1])
                 
                 if 0 < class_id <= len(OD_CLASS_NAMES):
                     class_name = OD_CLASS_NAMES[class_id - 1]
+
+                    color = (0, 255, 0)
+                    x_min = detection[3] * frame_width
+                    y_min = detection[4] * frame_height
+                    x_max = detection[5] * frame_width
+                    y_max = detection[6] * frame_height
+
+                    label = f"{class_name}: {confidence:.2f}"
                     
                     if class_name in STOP_CLASSES:
                         object_is_currently_visible = True
-                        
-                        color = (0, 0, 255) 
-                        x_min = detection[3] * frame_width
-                        y_min = detection[4] * frame_height
-                        x_max = detection[5] * frame_width
-                        y_max = detection[6] * frame_height
-                        cv.rectangle(frame_to_process, (int(x_min), int(y_min)), (int(x_max), int(y_max)), color, thickness=2)
-                        cv.putText(frame_to_process, class_name, (int(x_min), int(y_min - 10)), cv.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
-                        
-                        break # 객체 하나만 감지해도 정지
+                        color = (0, 0, 255)
 
+                    cv.rectangle(frame_to_process, (int(x_min), int(y_min)), (int(x_max), int(y_max)), color, thickness=2)
+                    cv.putText(frame_to_process, label, (int(x_min), int(y_min - 10)), cv.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
+                    
+                    if object_is_currently_visible:
+                        break
+
+        # ========== Emergency Stop Logic ==========
         if object_is_currently_visible:
             if is_emergency_stop == False:
                 car.motor_stop()
                 is_emergency_stop = True
-                print("OD: !!! EMERGENCY STOP TRIGGERED !!!")
         
         elif is_emergency_stop == True:
             is_emergency_stop = False
-            print("OD: Emergency stop released.")
 
+        # 시각화 결과가 포함된 프레임을 메인 스레드와 공유
         OD_frame_lock.acquire()
         global_frame = frame_to_process
         OD_frame_lock.release()
 
         time.sleep(0.1)
-    
+        
 def main():
     global global_frame
     global OD_frame_lock
-    global car
+    global is_emergency_stop
     global is_running
-    global enable_AIdrive
     
     camera = cv.VideoCapture(0)
     camera.set(cv.CAP_PROP_FRAME_WIDTH,v_x) 
     camera.set(cv.CAP_PROP_FRAME_HEIGHT,v_y)
-    
-    if not camera.isOpened():
-        print("Error: Camera failed to open. Check index or connection.")
-        is_running = False
-        return
     
     try:
         while( camera.isOpened() ):
@@ -193,22 +199,23 @@ def main():
             frame = cv.flip(frame,-1)
             
             OD_frame_lock.acquire()
-            global_frame = frame.copy()
+            global_frame = frame.copy() 
             OD_frame_lock.release()
-
+            
             OD_frame_lock.acquire()
             frame_to_display = global_frame.copy() 
             OD_frame_lock.release()
+            
             currently_stopped = is_emergency_stop
             
             cv.imshow('camera',frame_to_display)
             
             # image processing start here
-            crop_img = frame[int(v_y/2):,:]
+            crop_img = frame_to_display[int(v_y/2):,:]
             crop_img = cv.resize(crop_img, (200, 66))
             cv.imshow('crop_img ', cv.resize(crop_img, dsize=(0,0), fx=2, fy=2))
 
-            if enable_AIdrive == True and currently_stopped == False: 
+            if enable_AIdrive == True and currently_stopped == False:
                 drive_AI(crop_img)
 
             # image processing end here
@@ -228,9 +235,8 @@ def main():
         print("Exception type: ", exception_type)
         print("File name: ", filename)
         print("Line number: ", line_number)
+        global is_running
         is_running = False
-        
-    camera.release()
 
 if __name__ == '__main__':
 
@@ -240,10 +246,9 @@ if __name__ == '__main__':
     print(v_x_grid)
     moment = np.array([0, 0, 0])
 
-    model_path = 'modul/lane_navigation_20251127_1059.h5'
-
+    model_path = 'lane_navigation_20251127_1059.h5'
     model = load_model(model_path)
-
+    
     OD_MODEL = cv.dnn.readNetFromTensorflow(
         model='modul/frozen_inference_graph.pb',
         config='modul/ssd_mobilenet_v2_coco_2018_03_29.pbtxt'

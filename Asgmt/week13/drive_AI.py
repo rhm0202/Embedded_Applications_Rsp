@@ -19,7 +19,7 @@ OD_CLASS_NAMES = []
 with open('modul/object_detection_classes_coco.txt', 'r') as f: 
     OD_CLASS_NAMES = [ln.strip() for ln in f if ln.strip()]
 
-STOP_CLASSES = ['person', 'stop sign']  # 실제 주행용으로 적절한 클래스 지정
+STOP_CLASSES = ['mouse', 'cell phone']
 
 def key_cmd(which_key):
     global enable_AIdrive, is_emergency_stop, enable_OD, car

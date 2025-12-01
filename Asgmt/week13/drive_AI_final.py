@@ -22,13 +22,17 @@ OD_MODEL = cv.dnn.readNetFromTensorflow(
 no_object_counter = 0
 NO_OBJECT_THRESHOLD = 3
 
-detection_interval = 1
 frame_counter = 0
 OD_CLASS_NAMES = []
 with open('modul/object_detection_classes_coco.txt', 'r') as f: 
     OD_CLASS_NAMES = [ln.strip() for ln in f if ln.strip()]
 
-STOP_CLASSES = ['mouse', 'cell phone']
+STOP_CLASSES = ['laptop', 'clock']
+
+def buzzer_beep():
+    car.buzzer.alert_on()
+    time.sleep(0.5)
+    car.buzzer.alert_off()
 
 def key_cmd(which_key):
     global enable_AIdrive, is_emergency_stop, enable_OD, car
@@ -79,7 +83,8 @@ def object_detection_thread():
     global car, is_emergency_stop, global_frame
     global OD_frame_lock, is_running, enable_OD, frame_counter, no_object_counter
 
-
+    last_time = 0.0
+    
     while is_running:
         if not enable_OD:
             time.sleep(0.05)
@@ -95,13 +100,15 @@ def object_detection_thread():
             time.sleep(0.01)
             continue
 
-        frame_counter += 1
-        if frame_counter % detection_interval != 0:
-            time.sleep(0.005)
+        current_time = time.time()
+        if current_time - last_time < 0.4:   # 0.5초마다 한 번만 OD
+            time.sleep(0.01)
             continue
-        frame_counter = 0
+        last_time = current_time
+        
+        small_frame = cv.resize(frame_to_process, (160, 160))
 
-        blob = cv.dnn.blobFromImage(image=frame_to_process, size=(300, 300), swapRB=True)
+        blob = cv.dnn.blobFromImage(image=small_frame, size=(160, 160), swapRB=True)
         OD_MODEL.setInput(blob)
         output = OD_MODEL.forward()
 
@@ -111,7 +118,7 @@ def object_detection_thread():
 
         for detection in output[0, 0, :, :]:
             confidence = float(detection[2])
-            if confidence < 0.3:
+            if confidence < 0.2:
                 continue
             class_id = int(detection[1])
             if 0 < class_id <= len(OD_CLASS_NAMES):
@@ -138,6 +145,7 @@ def object_detection_thread():
 
         if object_is_currently_visible and not is_emergency_stop:
             car.motor_stop()
+            threading.Thread(target=buzzer_beep, daemon=True).start()
             is_emergency_stop = True
             no_object_counter = 0
         elif not object_is_currently_visible and is_emergency_stop:
@@ -189,7 +197,7 @@ if __name__ == '__main__':
     v_y = 240
     v_x_grid = [int(v_x*i/10) for i in range(1, 10)]
     print(v_x_grid)
-    model_path = 'modul/lane_navigation_20251127_1059.h5'
+    model_path = 'modul/lane_navigation_20251201_1643.h5'
     model = load_model(model_path)
     car = SDcar.Drive()
     is_running = True

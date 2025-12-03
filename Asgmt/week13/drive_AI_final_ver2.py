@@ -6,7 +6,7 @@ from modul import SDcar
 
 speed = 10
 is_emergency_stop = False 
-enable_OD = False        
+enable_OD = False 
 is_running = False 
 enable_AIdrive = False
 
@@ -19,15 +19,16 @@ OD_MODEL = cv.dnn.readNetFromTensorflow(
     config='modul/ssd_mobilenet_v2_coco_2018_03_29.pbtxt'
 )
 
-no_object_counter = 0
-NO_OBJECT_THRESHOLD = 3
+no_object_counter = 0 
+NO_OBJECT_THRESHOLD = 6 
+OBJECT_DETECTION_PERIOD = 0.5 
 
 frame_counter = 0
 OD_CLASS_NAMES = []
 with open('modul/object_detection_classes_coco.txt', 'r') as f: 
     OD_CLASS_NAMES = [ln.strip() for ln in f if ln.strip()]
-
-STOP_CLASSES = ['laptop', 'clock']
+    
+STOP_CLASSES = ['clock'] 
 
 def buzzer_beep():
     car.buzzer.alert_on()
@@ -42,17 +43,17 @@ def key_cmd(which_key):
     elif which_key & 0xFF == ord('s'):
         car.motor_back(speed)
     elif which_key & 0xFF == ord('a'):
-        car.motor_left(30)   
+        car.motor_left(30) 
     elif which_key & 0xFF == ord('d'):
-        car.motor_right(30)            
+        car.motor_right(30)          
     elif which_key & 0xFF == ord(' '):
         car.motor_stop()
-        enable_AIdrive = False   
-        is_emergency_stop = False  
+        enable_AIdrive = False 
+        is_emergency_stop = False 
     elif which_key & 0xFF == ord('q'):
         car.motor_stop()
         enable_AIdrive = False     
-        is_exit = True    
+        is_exit = True     
     elif which_key & 0xFF == ord('e'):
         enable_AIdrive = True
     elif which_key & 0xFF == ord('x'):
@@ -63,7 +64,7 @@ def key_cmd(which_key):
         enable_OD = True
     elif which_key & 0xFF == ord('r'):
         enable_OD = False
-    return is_exit  
+    return is_exit 
 
 def drive_AI(img):
     global car, model, is_emergency_stop
@@ -73,7 +74,7 @@ def drive_AI(img):
     if is_emergency_stop:
         return
     if steering_angle == 0:
-        car.motor_go(speed)
+        car.motor_go(60)
     elif steering_angle == 1:
         car.motor_left(20)          
     elif steering_angle == 2:
@@ -81,7 +82,7 @@ def drive_AI(img):
 
 def object_detection_thread():
     global car, is_emergency_stop, global_frame
-    global OD_frame_lock, is_running, enable_OD, frame_counter, no_object_counter
+    global OD_frame_lock, is_running, enable_OD, frame_counter, no_object_counter, NO_OBJECT_THRESHOLD, OBJECT_DETECTION_PERIOD
 
     last_time = 0.0
     
@@ -101,9 +102,11 @@ def object_detection_thread():
             continue
 
         current_time = time.time()
-        if current_time - last_time < 0.4:   # 0.5초마다 한 번만 OD
+
+        if current_time - last_time < OBJECT_DETECTION_PERIOD:
             time.sleep(0.01)
             continue
+        
         last_time = current_time
         
         small_frame = cv.resize(frame_to_process, (160, 160))
@@ -115,12 +118,13 @@ def object_detection_thread():
         h, w, _ = frame_to_process.shape
         detected_texts = []
         object_is_currently_visible = False
-
+        
         for detection in output[0, 0, :, :]:
             confidence = float(detection[2])
             if confidence < 0.2:
                 continue
             class_id = int(detection[1])
+            
             if 0 < class_id <= len(OD_CLASS_NAMES):
                 class_name = OD_CLASS_NAMES[class_id - 1]
             else:
@@ -133,6 +137,7 @@ def object_detection_thread():
 
             detected_texts.append(class_name)
             color = (0, 255, 0)
+            
             if class_name in STOP_CLASSES:
                 object_is_currently_visible = True
                 color = (0, 0, 255)
@@ -143,16 +148,23 @@ def object_detection_thread():
         if detected_texts:
             cv.putText(frame_to_process, "Detected: " + ", ".join(detected_texts),(10, 30), cv.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 0), 2)
 
-        if object_is_currently_visible and not is_emergency_stop:
-            car.motor_stop()
-            threading.Thread(target=buzzer_beep, daemon=True).start()
-            is_emergency_stop = True
-            no_object_counter = 0
-        elif not object_is_currently_visible and is_emergency_stop:
+        if object_is_currently_visible:
+            if not is_emergency_stop:
+                car.motor_stop()
+                threading.Thread(target=buzzer_beep, daemon=True).start()
+                is_emergency_stop = True
+                print("객체 감지됨. 비상 정지.")
+            no_object_counter = 0 # 카운터 초기화
+        
+        elif is_emergency_stop:
             no_object_counter += 1
+            print(f"객체 미감지 카운트: {no_object_counter}")
+
             if no_object_counter >= NO_OBJECT_THRESHOLD:
                 is_emergency_stop = False
                 no_object_counter = 0
+                print("객체 사라짐. 주행 재개 준비.")
+                
 
         with OD_frame_lock:
             global_frame = frame_to_process
@@ -181,8 +193,10 @@ def main():
             crop_img = cv.resize(crop_img, (200, 66))
             norm_img = cv.cvtColor(crop_img, cv.COLOR_BGR2RGB).astype(np.float32) / 255.0
             cv.imshow('crop_img', cv.resize(crop_img, dsize=(0,0), fx=2, fy=2))
+
             if enable_AIdrive and not currently_stopped:
                 drive_AI(norm_img)
+                
             which_key = cv.waitKey(20)
             if which_key > 0:
                 is_exit = key_cmd(which_key)    
@@ -199,13 +213,16 @@ if __name__ == '__main__':
     print(v_x_grid)
     model_path = 'modul/lane_navigation_20251201_1643.h5'
     model = load_model(model_path)
+
     car = SDcar.Drive()
     is_running = True
     enable_AIdrive = False
     enable_OD = False
+    
     t_od = threading.Thread(target=object_detection_thread, daemon=True)
     t_od.start()
     main()
+    
     is_running = False
     car.clean_GPIO()
     cv.destroyAllWindows()

@@ -4,7 +4,7 @@ import threading, time, sys
 from tensorflow.keras.models import load_model
 from modul import SDcar
 
-speed = 10
+speed = 20
 is_emergency_stop = False 
 enable_OD = False        
 is_running = False 
@@ -27,7 +27,7 @@ OD_CLASS_NAMES = []
 with open('modul/object_detection_classes_coco.txt', 'r') as f: 
     OD_CLASS_NAMES = [ln.strip() for ln in f if ln.strip()]
 
-STOP_CLASSES = ['laptop', 'clock']
+STOP_CLASSES = ['clock']
 
 def buzzer_beep():
     car.buzzer.alert_on()
@@ -73,7 +73,7 @@ def drive_AI(img):
     if is_emergency_stop:
         return
     if steering_angle == 0:
-        car.motor_go(60)
+        car.motor_go(speed)
     elif steering_angle == 1:
         car.motor_left(20)          
     elif steering_angle == 2:
